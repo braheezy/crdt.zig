@@ -159,28 +159,4 @@ pub fn build(b: *std.Build) void {
     check_step.dependOn(&lab_executable.step);
     check_step.dependOn(&lab_tests.step);
     test_step.dependOn(&run_lab_tests.step);
-
-    // Resolve UI dependencies in a separate build, only when its command runs.
-    // Calling lazyDependency here would request Vaxis even for library tests.
-    inline for (.{ "client", "client-run", "client-test" }) |name| {
-        const command = b.addSystemCommand(&.{
-            b.graph.zig_exe, "build",          "--build-file",                                 b.pathFromRoot("client/build.zig"),
-            "--prefix",      b.install_prefix, b.fmt("-Doptimize={s}", .{@tagName(optimize)}), b.fmt("-Dtarget={s}", .{target.query.zigTriple(b.allocator) catch @panic("OOM")}),
-        });
-        if (comptime std.mem.eql(u8, name, "client-run")) {
-            command.addArg("run");
-            command.stdio = .inherit;
-            if (b.args) |args| {
-                command.addArg("--");
-                command.addArgs(args);
-            }
-        }
-        if (comptime std.mem.eql(u8, name, "client-test")) command.addArg("test");
-        b.step(name, if (comptime std.mem.eql(u8, name, "client"))
-            "Build the optional terminal client"
-        else if (comptime std.mem.eql(u8, name, "client-test"))
-            "Test the optional terminal client's CRDT integration"
-        else
-            "Run the optional terminal client").dependOn(&command.step);
-    }
 }
