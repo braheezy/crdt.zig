@@ -26,7 +26,7 @@ pub fn build(b: *std.Build) void {
     // The public library module is rooted at the implementation's stable
     // facade.  Keep the historical module tests above, then compile the
     // facade and its conformance fixtures as separate test artifacts.
-    const library_module = b.addModule("collab", .{
+    const library_module = b.addModule("crdt_zig", .{
         .root_source_file = b.path("src/replica.zig"),
         .target = target,
         .optimize = optimize,
