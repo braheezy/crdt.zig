@@ -73,7 +73,7 @@ pub const Change = struct {
 };
 
 fn actorWithLastByte(last_byte: u8) id.ActorId {
-    var actor = [_]u8{0} ** 16;
+    var actor: [16]u8 = @splat(0);
     actor[15] = last_byte;
     return actor;
 }

@@ -829,7 +829,7 @@ fn randomPair(world: *World) [2]usize {
 }
 
 fn actorForNode(index: usize) ActorId {
-    var actor = [_]u8{0} ** 16;
+    var actor: [16]u8 = @splat(0);
     std.mem.writeInt(u64, actor[8..16], @intCast(index + 1), .big);
     return actor;
 }

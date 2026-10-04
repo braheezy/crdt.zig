@@ -91,7 +91,7 @@ pub fn build(b: *std.Build) void {
     benchmark_step.dependOn(&install_benchmark.step);
     const run_benchmark = b.addRunArtifact(benchmark);
     run_benchmark.step.dependOn(&install_benchmark.step);
-    if (b.args) |args| run_benchmark.addArgs(args);
+    run_benchmark.addPassthruArgs();
     benchmark_step.dependOn(&run_benchmark.step);
 
     // Keep the old step name as a harmless compatibility alias while callers
@@ -112,7 +112,7 @@ pub fn build(b: *std.Build) void {
     const install_lab = b.addInstallArtifact(lab_executable, .{});
     const run_lab = b.addRunArtifact(lab_executable);
     run_lab.step.dependOn(&install_lab.step);
-    if (b.args) |args| run_lab.addArgs(args);
+    run_lab.addPassthruArgs();
     const lab_step = b.step("lab", "Run the deterministic distributed-systems lab");
     lab_step.dependOn(&install_lab.step);
     lab_step.dependOn(&run_lab.step);
@@ -139,7 +139,7 @@ pub fn build(b: *std.Build) void {
         "--progress",
         "250",
     });
-    if (b.args) |args| run_lab_fuzz.addArgs(args);
+    run_lab_fuzz.addPassthruArgs();
     const lab_fuzz_step = b.step("lab-fuzz", "Sweep deterministic hostile network schedules");
     lab_fuzz_step.dependOn(&install_lab.step);
     lab_fuzz_step.dependOn(&run_lab_fuzz.step);

@@ -293,7 +293,7 @@ fn readVarint(bytes: []const u8, cursor: *usize) !u64 {
 }
 
 fn actor(last_byte: u8) ActorId {
-    var value = [_]u8{0} ** 16;
+    var value: [16]u8 = @splat(0);
     value[15] = last_byte;
     return value;
 }
@@ -435,8 +435,8 @@ test "Have decoding enforces a range count limit" {
 }
 
 fn allocationFailureHaveMerge(allocator: std.mem.Allocator) !void {
-    const actor_a = [_]u8{0} ** 15 ++ [_]u8{121};
-    const actor_b = [_]u8{0} ** 15 ++ [_]u8{122};
+    const actor_a = @as([15]u8, @splat(0)) ++ [_]u8{121};
+    const actor_b = @as([15]u8, @splat(0)) ++ [_]u8{122};
     var left = Have.init(allocator);
     defer left.deinit();
     var right = Have.init(allocator);

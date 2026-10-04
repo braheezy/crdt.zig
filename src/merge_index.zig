@@ -545,7 +545,7 @@ fn sameAnchor(left: Anchor, right: Anchor) bool {
 }
 
 fn actor(last_byte: u8) id.ActorId {
-    var value = [_]u8{0} ** 16;
+    var value: [16]u8 = @splat(0);
     value[15] = last_byte;
     return value;
 }

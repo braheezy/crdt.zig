@@ -654,7 +654,7 @@ pub const Replica = struct {
             try encodeChange(&frame, allocator, &event.change);
             try appendVarint(&bytes, allocator, frame.items.len);
             try bytes.appendSlice(allocator, frame.items);
-            try appendU32(&bytes, allocator, std.hash.crc.Crc32.hash(frame.items));
+            try appendU32(&bytes, allocator, std.hash.Crc32.hash(frame.items));
         }
 
         const pending_order = try allocator.alloc(usize, self.pending.items.len);
@@ -668,7 +668,7 @@ pub const Replica = struct {
             try encodeChange(&frame, allocator, pending_change);
             try appendVarint(&bytes, allocator, frame.items.len);
             try bytes.appendSlice(allocator, frame.items);
-            try appendU32(&bytes, allocator, std.hash.crc.Crc32.hash(frame.items));
+            try appendU32(&bytes, allocator, std.hash.Crc32.hash(frame.items));
         }
 
         return bytes.toOwnedSlice(allocator);
@@ -715,7 +715,7 @@ pub const Replica = struct {
             if (frame_len > options.max_frame_bytes) return error.FrameTooLarge;
             const frame = try readBytes(bytes, &cursor, frame_len);
             const checksum = try readU32(bytes, &cursor);
-            if (std.hash.crc.Crc32.hash(frame) != checksum) return error.ChecksumMismatch;
+            if (std.hash.Crc32.hash(frame) != checksum) return error.ChecksumMismatch;
 
             var frame_cursor: usize = 0;
             var decoded = try decodeChange(allocator, frame, &frame_cursor, options);
@@ -731,7 +731,7 @@ pub const Replica = struct {
             if (frame_len > options.max_frame_bytes) return error.FrameTooLarge;
             const frame = try readBytes(bytes, &cursor, frame_len);
             const checksum = try readU32(bytes, &cursor);
-            if (std.hash.crc.Crc32.hash(frame) != checksum) return error.ChecksumMismatch;
+            if (std.hash.Crc32.hash(frame) != checksum) return error.ChecksumMismatch;
 
             var frame_cursor: usize = 0;
             var decoded = try decodeChange(allocator, frame, &frame_cursor, options);
@@ -796,7 +796,7 @@ pub const Replica = struct {
                 }
                 return err;
             };
-            if (std.hash.crc.Crc32.hash(frame) != checksum) return error.ChecksumMismatch;
+            if (std.hash.Crc32.hash(frame) != checksum) return error.ChecksumMismatch;
 
             var frame_cursor: usize = 0;
             var decoded = try decodeChange(self.allocator, frame, &frame_cursor, options.limits);
@@ -1192,7 +1192,7 @@ pub const Replica = struct {
         var walked = try MergeIndex.initWithOrdering(scratch, self.ordering);
         errdefer walked.deinit();
 
-        const placeholder_actor = [_]u8{0xff} ** 16;
+        const placeholder_actor: [16]u8 = @splat(0xff);
         var placeholder_index: usize = 0;
         while (placeholder_index < placeholder_count) : (placeholder_index += 1) {
             if (placeholder_index > std.math.maxInt(u64)) return error.NotApplicable;
@@ -1948,7 +1948,7 @@ fn encodeLogFrame(list: *std.ArrayList(u8), allocator: std.mem.Allocator, change
     try encodeChange(&frame, allocator, change);
     try appendVarint(list, allocator, frame.items.len);
     try list.appendSlice(allocator, frame.items);
-    try appendU32(list, allocator, std.hash.crc.Crc32.hash(frame.items));
+    try appendU32(list, allocator, std.hash.Crc32.hash(frame.items));
 }
 
 fn decodeChange(
@@ -2069,7 +2069,8 @@ fn deliverBatch(replica: *Replica, batch: *const std.ArrayList(Change), reverse:
 }
 
 test "replica stats expose identity and sizes without changing state" {
-    const actor = [_]u8{0} ** 15 ++ [_]u8{7};
+    const actor = @as([15]u8, @splat(0)) ++ [_]u8{7};
+
     var replica = try Replica.init(std.testing.allocator, actor);
     defer replica.deinit();
 
@@ -2096,8 +2097,9 @@ test "replica stats expose identity and sizes without changing state" {
 }
 
 test "applyGroup commits sequential edits atomically and returns ordinary changes" {
-    const actor_a = [_]u8{0} ** 15 ++ [_]u8{8};
-    const actor_b = [_]u8{0} ** 15 ++ [_]u8{9};
+    const actor_a = @as([15]u8, @splat(0)) ++ [_]u8{8};
+    const actor_b = @as([15]u8, @splat(0)) ++ [_]u8{9};
+
     var source = try Replica.init(std.testing.allocator, actor_a);
     defer source.deinit();
     var target = try Replica.init(std.testing.allocator, actor_b);
@@ -2125,7 +2127,7 @@ test "applyGroup commits sequential edits atomically and returns ordinary change
 }
 
 test "applyGroup failure leaves the replica unchanged" {
-    const actor = [_]u8{0} ** 15 ++ [_]u8{10};
+    const actor = @as([15]u8, @splat(0)) ++ [_]u8{10};
     var replica = try Replica.init(std.testing.allocator, actor);
     defer replica.deinit();
 
@@ -2145,8 +2147,8 @@ test "applyGroup failure leaves the replica unchanged" {
 }
 
 test "replicas converge for concurrent inserts and retain runs" {
-    const a = [_]u8{0} ** 15 ++ [_]u8{1};
-    const b = [_]u8{0} ** 15 ++ [_]u8{2};
+    const a = @as([15]u8, @splat(0)) ++ [_]u8{1};
+    const b = @as([15]u8, @splat(0)) ++ [_]u8{2};
     var first = try Replica.init(std.testing.allocator, a);
     defer first.deinit();
     var second = try Replica.init(std.testing.allocator, b);
@@ -2171,8 +2173,8 @@ test "replicas converge for concurrent inserts and retain runs" {
 }
 
 test "out of order receive is pending then applied" {
-    const a = [_]u8{0} ** 15 ++ [_]u8{1};
-    const b = [_]u8{0} ** 15 ++ [_]u8{2};
+    const a = @as([15]u8, @splat(0)) ++ [_]u8{1};
+    const b = @as([15]u8, @splat(0)) ++ [_]u8{2};
     var source = try Replica.init(std.testing.allocator, a);
     defer source.deinit();
     var target = try Replica.init(std.testing.allocator, b);
@@ -2194,8 +2196,8 @@ test "out of order receive is pending then applied" {
 }
 
 test "duplicate pending delivery does not add a second queued change" {
-    const source_actor = [_]u8{0} ** 15 ++ [_]u8{4};
-    const target_actor = [_]u8{0} ** 15 ++ [_]u8{5};
+    const source_actor = @as([15]u8, @splat(0)) ++ [_]u8{4};
+    const target_actor = @as([15]u8, @splat(0)) ++ [_]u8{5};
     var source = try Replica.init(std.testing.allocator, source_actor);
     defer source.deinit();
     var target = try Replica.init(std.testing.allocator, target_actor);
@@ -2212,7 +2214,7 @@ test "duplicate pending delivery does not add a second queued change" {
 }
 
 test "changesSince returns only events outside a known causal version" {
-    const actor = [_]u8{0} ** 15 ++ [_]u8{1};
+    const actor = @as([15]u8, @splat(0)) ++ [_]u8{1};
     var replica = try Replica.init(std.testing.allocator, actor);
     defer replica.deinit();
 
@@ -2233,9 +2235,9 @@ test "changesSince returns only events outside a known causal version" {
 }
 
 test "changesSince emits a deterministic causal order independent of arrival order" {
-    const actor_a = [_]u8{0} ** 15 ++ [_]u8{1};
-    const actor_b = [_]u8{0} ** 15 ++ [_]u8{2};
-    const receiver_actor = [_]u8{0} ** 15 ++ [_]u8{3};
+    const actor_a = @as([15]u8, @splat(0)) ++ [_]u8{1};
+    const actor_b = @as([15]u8, @splat(0)) ++ [_]u8{2};
+    const receiver_actor = @as([15]u8, @splat(0)) ++ [_]u8{3};
 
     var source_a = try Replica.init(std.testing.allocator, actor_a);
     defer source_a.deinit();
@@ -2275,8 +2277,8 @@ test "changesSince emits a deterministic causal order independent of arrival ord
 }
 
 test "version diff identifies the branches needed for a walker" {
-    const actor_a = [_]u8{0} ** 15 ++ [_]u8{1};
-    const actor_b = [_]u8{0} ** 15 ++ [_]u8{2};
+    const actor_a = @as([15]u8, @splat(0)) ++ [_]u8{1};
+    const actor_b = @as([15]u8, @splat(0)) ++ [_]u8{2};
     var first = try Replica.init(std.testing.allocator, actor_a);
     defer first.deinit();
     var second = try Replica.init(std.testing.allocator, actor_b);
@@ -2310,7 +2312,7 @@ test "version diff identifies the branches needed for a walker" {
 }
 
 test "save and load preserve the document and causal history" {
-    const actor = [_]u8{0} ** 15 ++ [_]u8{1};
+    const actor = @as([15]u8, @splat(0)) ++ [_]u8{1};
     var original = try Replica.init(std.testing.allocator, actor);
     defer original.deinit();
 
@@ -2332,7 +2334,7 @@ test "save and load preserve the document and causal history" {
 }
 
 test "save and load preserve the selected sequence ordering" {
-    const actor = [_]u8{0} ** 15 ++ [_]u8{101};
+    const actor = @as([15]u8, @splat(0)) ++ [_]u8{101};
     var original = try Replica.initWithOrdering(std.testing.allocator, actor, .fugue);
     defer original.deinit();
     _ = try original.insert(0, "compat");
@@ -2347,8 +2349,8 @@ test "save and load preserve the selected sequence ordering" {
 }
 
 test "save and load preserve pending out of order changes" {
-    const source_actor = [_]u8{0} ** 15 ++ [_]u8{1};
-    const target_actor = [_]u8{0} ** 15 ++ [_]u8{2};
+    const source_actor = @as([15]u8, @splat(0)) ++ [_]u8{1};
+    const target_actor = @as([15]u8, @splat(0)) ++ [_]u8{2};
     var source = try Replica.init(std.testing.allocator, source_actor);
     defer source.deinit();
     var target = try Replica.init(std.testing.allocator, target_actor);
@@ -2380,7 +2382,7 @@ test "filesystem snapshot round trip is restart-safe" {
     var tmp = std.testing.tmpDir(.{});
     defer tmp.cleanup();
 
-    const actor = [_]u8{0} ** 15 ++ [_]u8{89};
+    const actor = @as([15]u8, @splat(0)) ++ [_]u8{89};
     var original = try Replica.initWithOrdering(std.testing.allocator, actor, .fugue);
     defer original.deinit();
     _ = try original.insert(0, "ab");
@@ -2413,7 +2415,7 @@ test "filesystem snapshot round trip is restart-safe" {
 }
 
 test "load bounds reject an excessive accepted-event count" {
-    const actor = [_]u8{0} ** 15 ++ [_]u8{81};
+    const actor = @as([15]u8, @splat(0)) ++ [_]u8{81};
     var replica = try Replica.init(std.testing.allocator, actor);
     defer replica.deinit();
     _ = try replica.insert(0, "event");
@@ -2427,7 +2429,7 @@ test "load bounds reject an excessive accepted-event count" {
 }
 
 test "load bounds reject oversized frames and insertion payloads" {
-    const actor = [_]u8{0} ** 15 ++ [_]u8{82};
+    const actor = @as([15]u8, @splat(0)) ++ [_]u8{82};
     var replica = try Replica.init(std.testing.allocator, actor);
     defer replica.deinit();
     _ = try replica.insert(0, "hello");
@@ -2445,9 +2447,9 @@ test "load bounds reject oversized frames and insertion payloads" {
 }
 
 test "load bounds reject an excessive parent frontier" {
-    const actor_a = [_]u8{0} ** 15 ++ [_]u8{83};
-    const actor_b = [_]u8{0} ** 15 ++ [_]u8{84};
-    const actor_c = [_]u8{0} ** 15 ++ [_]u8{85};
+    const actor_a = @as([15]u8, @splat(0)) ++ [_]u8{83};
+    const actor_b = @as([15]u8, @splat(0)) ++ [_]u8{84};
+    const actor_c = @as([15]u8, @splat(0)) ++ [_]u8{85};
     var first = try Replica.init(std.testing.allocator, actor_a);
     defer first.deinit();
     var second = try Replica.init(std.testing.allocator, actor_b);
@@ -2474,8 +2476,8 @@ test "load bounds reject an excessive parent frontier" {
 }
 
 test "load bounds reject an excessive pending-change count" {
-    const source_actor = [_]u8{0} ** 15 ++ [_]u8{86};
-    const target_actor = [_]u8{0} ** 15 ++ [_]u8{87};
+    const source_actor = @as([15]u8, @splat(0)) ++ [_]u8{86};
+    const target_actor = @as([15]u8, @splat(0)) ++ [_]u8{87};
     var source = try Replica.init(std.testing.allocator, source_actor);
     defer source.deinit();
     var target = try Replica.init(std.testing.allocator, target_actor);
@@ -2501,7 +2503,7 @@ test "load bounds reject an excessive pending-change count" {
 }
 
 test "load rejects a frame mislabeled as pending" {
-    const actor = [_]u8{0} ** 15 ++ [_]u8{87};
+    const actor = @as([15]u8, @splat(0)) ++ [_]u8{87};
     var source = try Replica.init(std.testing.allocator, actor);
     defer source.deinit();
     _ = try source.insert(0, "accepted");
@@ -2521,7 +2523,7 @@ test "load rejects a frame mislabeled as pending" {
 }
 
 test "counter exhaustion rejects local edits without changing state" {
-    const actor = [_]u8{0} ** 15 ++ [_]u8{120};
+    const actor = @as([15]u8, @splat(0)) ++ [_]u8{120};
     var replica = try Replica.init(std.testing.allocator, actor);
     defer replica.deinit();
     replica.next_counter = std.math.maxInt(u64);
@@ -2534,7 +2536,7 @@ test "counter exhaustion rejects local edits without changing state" {
 }
 
 test "local scalar operations accept the end boundary and zero-length delete" {
-    const actor = [_]u8{0} ** 15 ++ [_]u8{121};
+    const actor = @as([15]u8, @splat(0)) ++ [_]u8{121};
     var replica = try Replica.init(std.testing.allocator, actor);
     defer replica.deinit();
 
@@ -2548,7 +2550,7 @@ test "local scalar operations accept the end boundary and zero-length delete" {
 }
 
 test "local scalar operations reject positions past the end" {
-    const actor = [_]u8{0} ** 15 ++ [_]u8{122};
+    const actor = @as([15]u8, @splat(0)) ++ [_]u8{122};
     var replica = try Replica.init(std.testing.allocator, actor);
     defer replica.deinit();
     _ = try replica.insert(0, "ab");
@@ -2562,7 +2564,7 @@ test "local scalar operations reject positions past the end" {
 }
 
 test "load bounds reject an input byte limit before constructing a replica" {
-    const actor = [_]u8{0} ** 15 ++ [_]u8{88};
+    const actor = @as([15]u8, @splat(0)) ++ [_]u8{88};
     var replica = try Replica.init(std.testing.allocator, actor);
     defer replica.deinit();
     _ = try replica.insert(0, "bytes");
@@ -2577,8 +2579,8 @@ test "load bounds reject an input byte limit before constructing a replica" {
 }
 
 test "ChangeLog appends changes and replays duplicate deliveries idempotently" {
-    const source_actor = [_]u8{0} ** 15 ++ [_]u8{91};
-    const target_actor = [_]u8{0} ** 15 ++ [_]u8{92};
+    const source_actor = @as([15]u8, @splat(0)) ++ [_]u8{91};
+    const target_actor = @as([15]u8, @splat(0)) ++ [_]u8{92};
     var source = try Replica.init(std.testing.allocator, source_actor);
     defer source.deinit();
     var target = try Replica.init(std.testing.allocator, target_actor);
@@ -2615,7 +2617,7 @@ test "ChangeLog appends changes and replays duplicate deliveries idempotently" {
 }
 
 test "ChangeLog can transfer its encoded bytes without retaining ownership" {
-    const actor = [_]u8{0} ** 15 ++ [_]u8{90};
+    const actor = @as([15]u8, @splat(0)) ++ [_]u8{90};
     var source = try Replica.init(std.testing.allocator, actor);
     defer source.deinit();
     const change_id = try source.insert(0, "owned");
@@ -2632,8 +2634,8 @@ test "ChangeLog can transfer its encoded bytes without retaining ownership" {
 }
 
 test "ChangeLog replay repairs an out-of-order child and drains pending state" {
-    const source_actor = [_]u8{0} ** 15 ++ [_]u8{93};
-    const target_actor = [_]u8{0} ** 15 ++ [_]u8{94};
+    const source_actor = @as([15]u8, @splat(0)) ++ [_]u8{93};
+    const target_actor = @as([15]u8, @splat(0)) ++ [_]u8{94};
     var source = try Replica.init(std.testing.allocator, source_actor);
     defer source.deinit();
     var target = try Replica.init(std.testing.allocator, target_actor);
@@ -2660,8 +2662,8 @@ test "ChangeLog replay repairs an out-of-order child and drains pending state" {
 }
 
 test "ChangeLog appendSince emits only changes outside a known version" {
-    const source_actor = [_]u8{0} ** 15 ++ [_]u8{95};
-    const target_actor = [_]u8{0} ** 15 ++ [_]u8{96};
+    const source_actor = @as([15]u8, @splat(0)) ++ [_]u8{95};
+    const target_actor = @as([15]u8, @splat(0)) ++ [_]u8{96};
     var source = try Replica.init(std.testing.allocator, source_actor);
     defer source.deinit();
     var target = try Replica.init(std.testing.allocator, target_actor);
@@ -2688,8 +2690,8 @@ test "ChangeLog appendSince emits only changes outside a known version" {
 }
 
 test "ChangeLog strict replay rejects a torn tail without mutating the target" {
-    const source_actor = [_]u8{0} ** 15 ++ [_]u8{97};
-    const target_actor = [_]u8{0} ** 15 ++ [_]u8{98};
+    const source_actor = @as([15]u8, @splat(0)) ++ [_]u8{97};
+    const target_actor = @as([15]u8, @splat(0)) ++ [_]u8{98};
     var source = try Replica.init(std.testing.allocator, source_actor);
     defer source.deinit();
     var target = try Replica.init(std.testing.allocator, target_actor);
@@ -2715,8 +2717,8 @@ test "ChangeLog strict replay rejects a torn tail without mutating the target" {
 }
 
 test "ChangeLog recovery commits the complete prefix of a torn tail" {
-    const source_actor = [_]u8{0} ** 15 ++ [_]u8{99};
-    const target_actor = [_]u8{0} ** 15 ++ [_]u8{100};
+    const source_actor = @as([15]u8, @splat(0)) ++ [_]u8{99};
+    const target_actor = @as([15]u8, @splat(0)) ++ [_]u8{100};
     var source = try Replica.init(std.testing.allocator, source_actor);
     defer source.deinit();
     var target = try Replica.init(std.testing.allocator, target_actor);
@@ -2746,8 +2748,8 @@ test "ChangeLog recovery commits the complete prefix of a torn tail" {
 }
 
 test "ChangeLog recovery never accepts a complete frame with a bad checksum" {
-    const source_actor = [_]u8{0} ** 15 ++ [_]u8{101};
-    const target_actor = [_]u8{0} ** 15 ++ [_]u8{102};
+    const source_actor = @as([15]u8, @splat(0)) ++ [_]u8{101};
+    const target_actor = @as([15]u8, @splat(0)) ++ [_]u8{102};
     var source = try Replica.init(std.testing.allocator, source_actor);
     defer source.deinit();
     var target = try Replica.init(std.testing.allocator, target_actor);
@@ -2776,8 +2778,8 @@ test "filesystem ChangeLog recovery keeps only the complete prefix" {
     var tmp = std.testing.tmpDir(.{});
     defer tmp.cleanup();
 
-    const source_actor = [_]u8{0} ** 15 ++ [_]u8{106};
-    const target_actor = [_]u8{0} ** 15 ++ [_]u8{107};
+    const source_actor = @as([15]u8, @splat(0)) ++ [_]u8{106};
+    const target_actor = @as([15]u8, @splat(0)) ++ [_]u8{107};
     var source = try Replica.init(std.testing.allocator, source_actor);
     defer source.deinit();
     var target = try Replica.init(std.testing.allocator, target_actor);
@@ -2821,8 +2823,8 @@ test "filesystem ChangeLog recovery keeps only the complete prefix" {
 }
 
 test "ChangeLog replay is atomic when a complete frame contains an invalid edit" {
-    const source_actor = [_]u8{0} ** 15 ++ [_]u8{103};
-    const target_actor = [_]u8{0} ** 15 ++ [_]u8{104};
+    const source_actor = @as([15]u8, @splat(0)) ++ [_]u8{103};
+    const target_actor = @as([15]u8, @splat(0)) ++ [_]u8{104};
     var source = try Replica.init(std.testing.allocator, source_actor);
     defer source.deinit();
     var target = try Replica.init(std.testing.allocator, target_actor);
@@ -2831,7 +2833,7 @@ test "ChangeLog replay is atomic when a complete frame contains an invalid edit"
     const parent_id = try source.insert(0, "A");
     var parent = try source.change(parent_id, std.testing.allocator);
     defer parent.deinit(std.testing.allocator);
-    const invalid_id = OpId{ .actor = [_]u8{0} ** 15 ++ [_]u8{105}, .counter = 0 };
+    const invalid_id = OpId{ .actor = @as([15]u8, @splat(0)) ++ [_]u8{105}, .counter = 0 };
     var invalid_operation = try Operation.initInsert(std.testing.allocator, 99, "X");
     defer invalid_operation.deinit(std.testing.allocator);
     var invalid = try Change.init(std.testing.allocator, invalid_id, &.{parent_id}, invalid_operation);
@@ -2848,8 +2850,8 @@ test "ChangeLog replay is atomic when a complete frame contains an invalid edit"
 }
 
 test "persistence and replay limits fail before mutating a target" {
-    const source_actor = [_]u8{0} ** 15 ++ [_]u8{108};
-    const target_actor = [_]u8{0} ** 15 ++ [_]u8{109};
+    const source_actor = @as([15]u8, @splat(0)) ++ [_]u8{108};
+    const target_actor = @as([15]u8, @splat(0)) ++ [_]u8{109};
     var source = try Replica.init(std.testing.allocator, source_actor);
     defer source.deinit();
     var target = try Replica.init(std.testing.allocator, target_actor);
@@ -2882,8 +2884,8 @@ test "persistence and replay limits fail before mutating a target" {
 }
 
 test "a duplicate ID with different content is rejected" {
-    const actor = [_]u8{0} ** 15 ++ [_]u8{1};
-    const other_actor = [_]u8{0} ** 15 ++ [_]u8{2};
+    const actor = @as([15]u8, @splat(0)) ++ [_]u8{1};
+    const other_actor = @as([15]u8, @splat(0)) ++ [_]u8{2};
     var source = try Replica.init(std.testing.allocator, actor);
     defer source.deinit();
     var target = try Replica.init(std.testing.allocator, other_actor);
@@ -2903,14 +2905,14 @@ test "a duplicate ID with different content is rejected" {
 }
 
 test "receive rejects a non-canonical parent frontier before buffering it" {
-    const actor = [_]u8{0} ** 15 ++ [_]u8{1};
+    const actor = @as([15]u8, @splat(0)) ++ [_]u8{1};
     var replica = try Replica.init(std.testing.allocator, actor);
     defer replica.deinit();
 
     var operation = try Operation.initInsert(std.testing.allocator, 0, "x");
     defer operation.deinit(std.testing.allocator);
-    const first_parent = OpId{ .actor = [_]u8{0} ** 15 ++ [_]u8{2}, .counter = 0 };
-    const second_parent = OpId{ .actor = [_]u8{0} ** 15 ++ [_]u8{3}, .counter = 0 };
+    const first_parent = OpId{ .actor = @as([15]u8, @splat(0)) ++ [_]u8{2}, .counter = 0 };
+    const second_parent = OpId{ .actor = @as([15]u8, @splat(0)) ++ [_]u8{3}, .counter = 0 };
     var malformed = try Change.init(
         std.testing.allocator,
         OpId{ .actor = actor, .counter = 0 },
@@ -2931,8 +2933,8 @@ test "receive rejects a non-canonical parent frontier before buffering it" {
 }
 
 test "receive rejects a frontier that contains an ancestor and its descendant" {
-    const source_actor = [_]u8{0} ** 15 ++ [_]u8{6};
-    const target_actor = [_]u8{0} ** 15 ++ [_]u8{7};
+    const source_actor = @as([15]u8, @splat(0)) ++ [_]u8{6};
+    const target_actor = @as([15]u8, @splat(0)) ++ [_]u8{7};
     var source = try Replica.init(std.testing.allocator, source_actor);
     defer source.deinit();
     var target = try Replica.init(std.testing.allocator, target_actor);
@@ -2963,7 +2965,7 @@ test "receive rejects a frontier that contains an ancestor and its descendant" {
 }
 
 test "receive rejects a self-parent before buffering" {
-    const actor = [_]u8{0} ** 15 ++ [_]u8{8};
+    const actor = @as([15]u8, @splat(0)) ++ [_]u8{8};
     var replica = try Replica.init(std.testing.allocator, actor);
     defer replica.deinit();
 
@@ -2979,7 +2981,7 @@ test "receive rejects a self-parent before buffering" {
 }
 
 test "receive rejects invalid UTF-8 without changing history" {
-    const actor = [_]u8{0} ** 15 ++ [_]u8{1};
+    const actor = @as([15]u8, @splat(0)) ++ [_]u8{1};
     var replica = try Replica.init(std.testing.allocator, actor);
     defer replica.deinit();
 
@@ -2987,7 +2989,7 @@ test "receive rejects invalid UTF-8 without changing history" {
     defer operation.deinit(std.testing.allocator);
     var malformed = try Change.init(
         std.testing.allocator,
-        OpId{ .actor = [_]u8{0} ** 15 ++ [_]u8{2}, .counter = 0 },
+        OpId{ .actor = @as([15]u8, @splat(0)) ++ [_]u8{2}, .counter = 0 },
         &.{},
         operation,
     );
@@ -2999,7 +3001,7 @@ test "receive rejects invalid UTF-8 without changing history" {
 }
 
 test "receiving an actor's out of order changes advances its local counter" {
-    const actor = [_]u8{0} ** 15 ++ [_]u8{1};
+    const actor = @as([15]u8, @splat(0)) ++ [_]u8{1};
     var source = try Replica.init(std.testing.allocator, actor);
     defer source.deinit();
     var target = try Replica.init(std.testing.allocator, actor);
@@ -3021,9 +3023,9 @@ test "receiving an actor's out of order changes advances its local counter" {
 }
 
 test "a rejected remote operation leaves the replay cache usable" {
-    const source_actor = [_]u8{0} ** 15 ++ [_]u8{1};
-    const bad_actor = [_]u8{0} ** 15 ++ [_]u8{2};
-    const target_actor = [_]u8{0} ** 15 ++ [_]u8{3};
+    const source_actor = @as([15]u8, @splat(0)) ++ [_]u8{1};
+    const bad_actor = @as([15]u8, @splat(0)) ++ [_]u8{2};
+    const target_actor = @as([15]u8, @splat(0)) ++ [_]u8{3};
     var source = try Replica.init(std.testing.allocator, source_actor);
     defer source.deinit();
     var target = try Replica.init(std.testing.allocator, target_actor);
@@ -3057,8 +3059,8 @@ test "a rejected remote operation leaves the replay cache usable" {
 }
 
 test "concurrent deletes of different characters converge" {
-    const actor_a = [_]u8{0} ** 15 ++ [_]u8{1};
-    const actor_b = [_]u8{0} ** 15 ++ [_]u8{2};
+    const actor_a = @as([15]u8, @splat(0)) ++ [_]u8{1};
+    const actor_b = @as([15]u8, @splat(0)) ++ [_]u8{2};
     var first = try Replica.init(std.testing.allocator, actor_a);
     defer first.deinit();
     var second = try Replica.init(std.testing.allocator, actor_b);
@@ -3087,8 +3089,8 @@ test "concurrent deletes of different characters converge" {
 }
 
 test "concurrent deletes of the same character are idempotent" {
-    const actor_a = [_]u8{0} ** 15 ++ [_]u8{1};
-    const actor_b = [_]u8{0} ** 15 ++ [_]u8{2};
+    const actor_a = @as([15]u8, @splat(0)) ++ [_]u8{1};
+    const actor_b = @as([15]u8, @splat(0)) ++ [_]u8{2};
     var first = try Replica.init(std.testing.allocator, actor_a);
     defer first.deinit();
     var second = try Replica.init(std.testing.allocator, actor_b);
@@ -3114,8 +3116,8 @@ test "concurrent deletes of the same character are idempotent" {
 }
 
 test "overlapping concurrent delete ranges remove the union" {
-    const actor_a = [_]u8{0} ** 15 ++ [_]u8{110};
-    const actor_b = [_]u8{0} ** 15 ++ [_]u8{111};
+    const actor_a = @as([15]u8, @splat(0)) ++ [_]u8{110};
+    const actor_b = @as([15]u8, @splat(0)) ++ [_]u8{111};
     var first = try Replica.init(std.testing.allocator, actor_a);
     defer first.deinit();
     var second = try Replica.init(std.testing.allocator, actor_b);
@@ -3140,8 +3142,8 @@ test "overlapping concurrent delete ranges remove the union" {
 }
 
 test "an insertion after a deleted anchor remains ordered when branches merge" {
-    const actor_a = [_]u8{0} ** 15 ++ [_]u8{112};
-    const actor_b = [_]u8{0} ** 15 ++ [_]u8{113};
+    const actor_a = @as([15]u8, @splat(0)) ++ [_]u8{112};
+    const actor_b = @as([15]u8, @splat(0)) ++ [_]u8{113};
     var first = try Replica.init(std.testing.allocator, actor_a);
     defer first.deinit();
     var second = try Replica.init(std.testing.allocator, actor_b);
@@ -3167,7 +3169,7 @@ test "an insertion after a deleted anchor remains ordered when branches merge" {
 }
 
 test "loading a truncated save reports an incomplete frame" {
-    const actor = [_]u8{0} ** 15 ++ [_]u8{1};
+    const actor = @as([15]u8, @splat(0)) ++ [_]u8{1};
     var replica = try Replica.init(std.testing.allocator, actor);
     defer replica.deinit();
     _ = try replica.insert(0, "abc");
@@ -3178,12 +3180,12 @@ test "loading a truncated save reports an incomplete frame" {
 }
 
 test "loading a save with a bad magic is rejected" {
-    var bytes = [_]u8{0} ** 33;
+    var bytes: [33]u8 = @splat(0);
     try std.testing.expectError(error.InvalidFormat, Replica.load(std.testing.allocator, &bytes));
 }
 
 test "loading a save with a corrupted frame reports a checksum mismatch" {
-    const actor = [_]u8{0} ** 15 ++ [_]u8{1};
+    const actor = @as([15]u8, @splat(0)) ++ [_]u8{1};
     var replica = try Replica.init(std.testing.allocator, actor);
     defer replica.deinit();
     _ = try replica.insert(0, "abc");
@@ -3198,7 +3200,7 @@ test "loading a save with a corrupted frame reports a checksum mismatch" {
 }
 
 test "replica indexes Unicode scalars rather than UTF-8 bytes" {
-    const actor = [_]u8{0} ** 15 ++ [_]u8{1};
+    const actor = @as([15]u8, @splat(0)) ++ [_]u8{1};
     var replica = try Replica.init(std.testing.allocator, actor);
     defer replica.deinit();
 
@@ -3211,8 +3213,8 @@ test "replica indexes Unicode scalars rather than UTF-8 bytes" {
 }
 
 fn allocationFailureLocalAndReceive(allocator: std.mem.Allocator) !void {
-    const source_actor = [_]u8{0} ** 15 ++ [_]u8{111};
-    const target_actor = [_]u8{0} ** 15 ++ [_]u8{112};
+    const source_actor = @as([15]u8, @splat(0)) ++ [_]u8{111};
+    const target_actor = @as([15]u8, @splat(0)) ++ [_]u8{112};
     var source = try Replica.init(allocator, source_actor);
     defer source.deinit();
     var target = try Replica.init(allocator, target_actor);
@@ -3238,7 +3240,7 @@ test "local edits and receive are allocation-failure atomic" {
 }
 
 fn allocationFailureApplyGroup(allocator: std.mem.Allocator) !void {
-    const actor = [_]u8{0} ** 15 ++ [_]u8{113};
+    const actor = @as([15]u8, @splat(0)) ++ [_]u8{113};
     var replica = try Replica.init(allocator, actor);
     defer replica.deinit();
     _ = try replica.insert(0, "base");
@@ -3260,8 +3262,8 @@ test "applyGroup is allocation-failure atomic" {
 }
 
 fn allocationFailurePendingDelivery(allocator: std.mem.Allocator) !void {
-    const source_actor = [_]u8{0} ** 15 ++ [_]u8{113};
-    const target_actor = [_]u8{0} ** 15 ++ [_]u8{114};
+    const source_actor = @as([15]u8, @splat(0)) ++ [_]u8{113};
+    const target_actor = @as([15]u8, @splat(0)) ++ [_]u8{114};
     var source = try Replica.init(allocator, source_actor);
     defer source.deinit();
     var target = try Replica.init(allocator, target_actor);
@@ -3288,8 +3290,8 @@ test "pending delivery and retry are allocation-failure atomic" {
 }
 
 fn allocationFailurePersistenceAndReplay(allocator: std.mem.Allocator) !void {
-    const source_actor = [_]u8{0} ** 15 ++ [_]u8{115};
-    const target_actor = [_]u8{0} ** 15 ++ [_]u8{116};
+    const source_actor = @as([15]u8, @splat(0)) ++ [_]u8{115};
+    const target_actor = @as([15]u8, @splat(0)) ++ [_]u8{116};
     var source = try Replica.init(allocator, source_actor);
     defer source.deinit();
     var target = try Replica.init(allocator, target_actor);
@@ -3328,7 +3330,7 @@ test "save load and ChangeLog replay are allocation-failure atomic" {
 }
 
 test "textView borrows current bytes without an allocation" {
-    const actor = [_]u8{0} ** 15 ++ [_]u8{1};
+    const actor = @as([15]u8, @splat(0)) ++ [_]u8{1};
     var replica = try Replica.init(std.testing.allocator, actor);
     defer replica.deinit();
 
@@ -3337,8 +3339,8 @@ test "textView borrows current bytes without an allocation" {
 }
 
 test "read-only inspection reports history, pending changes, and frontier" {
-    const source_actor = [_]u8{0} ** 15 ++ [_]u8{1};
-    const target_actor = [_]u8{0} ** 15 ++ [_]u8{2};
+    const source_actor = @as([15]u8, @splat(0)) ++ [_]u8{1};
+    const target_actor = @as([15]u8, @splat(0)) ++ [_]u8{2};
     var source = try Replica.init(std.testing.allocator, source_actor);
     defer source.deinit();
     var target = try Replica.init(std.testing.allocator, target_actor);
@@ -3365,8 +3367,8 @@ test "read-only inspection reports history, pending changes, and frontier" {
 }
 
 test "have summarizes accepted IDs and excludes pending changes" {
-    const source_actor = [_]u8{0} ** 15 ++ [_]u8{61};
-    const target_actor = [_]u8{0} ** 15 ++ [_]u8{62};
+    const source_actor = @as([15]u8, @splat(0)) ++ [_]u8{61};
+    const target_actor = @as([15]u8, @splat(0)) ++ [_]u8{62};
     var source = try Replica.init(std.testing.allocator, source_actor);
     defer source.deinit();
     var target = try Replica.init(std.testing.allocator, target_actor);
@@ -3393,7 +3395,7 @@ test "have summarizes accepted IDs and excludes pending changes" {
 }
 
 test "encodeHave exposes the same canonical summary as have" {
-    const actor_id = [_]u8{0} ** 15 ++ [_]u8{64};
+    const actor_id = @as([15]u8, @splat(0)) ++ [_]u8{64};
     var replica = try Replica.init(std.testing.allocator, actor_id);
     defer replica.deinit();
     _ = try replica.insert(0, "A");
@@ -3408,7 +3410,7 @@ test "encodeHave exposes the same canonical summary as have" {
 }
 
 test "changesForHave sends a missing parent before a known child hole" {
-    const source_actor = [_]u8{0} ** 15 ++ [_]u8{63};
+    const source_actor = @as([15]u8, @splat(0)) ++ [_]u8{63};
     var source = try Replica.init(std.testing.allocator, source_actor);
     defer source.deinit();
 
@@ -3428,8 +3430,8 @@ test "changesForHave sends a missing parent before a known child hole" {
 }
 
 test "SyncCursor repeats an unacknowledged batch and resumes after acknowledgement" {
-    const source_actor = [_]u8{0} ** 15 ++ [_]u8{65};
-    const target_actor = [_]u8{0} ** 15 ++ [_]u8{66};
+    const source_actor = @as([15]u8, @splat(0)) ++ [_]u8{65};
+    const target_actor = @as([15]u8, @splat(0)) ++ [_]u8{66};
     var source = try Replica.init(std.testing.allocator, source_actor);
     defer source.deinit();
     var target = try Replica.init(std.testing.allocator, target_actor);
@@ -3469,8 +3471,8 @@ test "SyncCursor repeats an unacknowledged batch and resumes after acknowledgeme
 }
 
 test "SyncCursor repairs a pending child without resending known changes" {
-    const source_actor = [_]u8{0} ** 15 ++ [_]u8{67};
-    const target_actor = [_]u8{0} ** 15 ++ [_]u8{68};
+    const source_actor = @as([15]u8, @splat(0)) ++ [_]u8{67};
+    const target_actor = @as([15]u8, @splat(0)) ++ [_]u8{68};
     var source = try Replica.init(std.testing.allocator, source_actor);
     defer source.deinit();
     var target = try Replica.init(std.testing.allocator, target_actor);
@@ -3507,9 +3509,9 @@ test "SyncCursor repairs a pending child without resending known changes" {
 
 test "SyncCursor reconnect loop converges with bounded reverse batches" {
     const actors = [_]ActorId{
-        [_]u8{0} ** 15 ++ [_]u8{69},
-        [_]u8{0} ** 15 ++ [_]u8{70},
-        [_]u8{0} ** 15 ++ [_]u8{71},
+        @as([15]u8, @splat(0)) ++ [_]u8{69},
+        @as([15]u8, @splat(0)) ++ [_]u8{70},
+        @as([15]u8, @splat(0)) ++ [_]u8{71},
     };
     var replicas: [3]*Replica = undefined;
     for (&replicas, actors) |*slot, actor_id| slot.* = try Replica.init(std.testing.allocator, actor_id);
@@ -3559,8 +3561,8 @@ test "SyncCursor reconnect loop converges with bounded reverse batches" {
 }
 
 test "SyncCursor rejects a zero batch limit without changing knowledge" {
-    const source_actor = [_]u8{0} ** 15 ++ [_]u8{117};
-    const target_actor = [_]u8{0} ** 15 ++ [_]u8{118};
+    const source_actor = @as([15]u8, @splat(0)) ++ [_]u8{117};
+    const target_actor = @as([15]u8, @splat(0)) ++ [_]u8{118};
     var source = try Replica.init(std.testing.allocator, source_actor);
     defer source.deinit();
     var target = try Replica.init(std.testing.allocator, target_actor);
@@ -3579,7 +3581,7 @@ test "SyncCursor rejects a zero batch limit without changing knowledge" {
 }
 
 fn allocationFailureSyncCursor(allocator: std.mem.Allocator) !void {
-    const source_actor = [_]u8{0} ** 15 ++ [_]u8{119};
+    const source_actor = @as([15]u8, @splat(0)) ++ [_]u8{119};
     var source = try Replica.init(allocator, source_actor);
     defer source.deinit();
     _ = try source.insert(0, "cursor");
@@ -3602,7 +3604,7 @@ test "SyncCursor acknowledgement is allocation-failure atomic" {
 }
 
 test "an invalid local UTF-8 edit changes neither history nor text" {
-    const actor = [_]u8{0} ** 15 ++ [_]u8{1};
+    const actor = @as([15]u8, @splat(0)) ++ [_]u8{1};
     var replica = try Replica.init(std.testing.allocator, actor);
     defer replica.deinit();
 
@@ -3614,9 +3616,9 @@ test "an invalid local UTF-8 edit changes neither history nor text" {
 }
 
 test "three replicas converge after mixed offline edits and adversarial delivery" {
-    const actor_a = [_]u8{0} ** 15 ++ [_]u8{1};
-    const actor_b = [_]u8{0} ** 15 ++ [_]u8{2};
-    const actor_c = [_]u8{0} ** 15 ++ [_]u8{3};
+    const actor_a = @as([15]u8, @splat(0)) ++ [_]u8{1};
+    const actor_b = @as([15]u8, @splat(0)) ++ [_]u8{2};
+    const actor_c = @as([15]u8, @splat(0)) ++ [_]u8{3};
     var first = try Replica.init(std.testing.allocator, actor_a);
     defer first.deinit();
     var second = try Replica.init(std.testing.allocator, actor_b);
@@ -3666,8 +3668,8 @@ test "three replicas converge after mixed offline edits and adversarial delivery
 }
 
 test "a local edit after merging multiple parents is replayable remotely" {
-    const actor_a = [_]u8{0} ** 15 ++ [_]u8{71};
-    const actor_b = [_]u8{0} ** 15 ++ [_]u8{72};
+    const actor_a = @as([15]u8, @splat(0)) ++ [_]u8{71};
+    const actor_b = @as([15]u8, @splat(0)) ++ [_]u8{72};
     var first = try Replica.init(std.testing.allocator, actor_a);
     defer first.deinit();
     var second = try Replica.init(std.testing.allocator, actor_b);
@@ -3701,8 +3703,8 @@ test "a local edit after merging multiple parents is replayable remotely" {
 }
 
 test "walker replay matches the exhaustive oracle on a branching history" {
-    const actor_a = [_]u8{0} ** 15 ++ [_]u8{1};
-    const actor_b = [_]u8{0} ** 15 ++ [_]u8{2};
+    const actor_a = @as([15]u8, @splat(0)) ++ [_]u8{1};
+    const actor_b = @as([15]u8, @splat(0)) ++ [_]u8{2};
     var first = try Replica.init(std.testing.allocator, actor_a);
     defer first.deinit();
     var second = try Replica.init(std.testing.allocator, actor_b);
@@ -3740,8 +3742,8 @@ test "walker replay matches the exhaustive oracle on a branching history" {
 }
 
 test "critical replay transforms a multi-scalar delete onto a divergent branch" {
-    const actor_a = [_]u8{0} ** 15 ++ [_]u8{11};
-    const actor_b = [_]u8{0} ** 15 ++ [_]u8{12};
+    const actor_a = @as([15]u8, @splat(0)) ++ [_]u8{11};
+    const actor_b = @as([15]u8, @splat(0)) ++ [_]u8{12};
     var first = try Replica.init(std.testing.allocator, actor_a);
     defer first.deinit();
     var second = try Replica.init(std.testing.allocator, actor_b);
@@ -3775,8 +3777,8 @@ test "critical replay transforms a multi-scalar delete onto a divergent branch" 
 }
 
 test "critical replay maps through a concurrent tombstone" {
-    const actor_a = [_]u8{0} ** 15 ++ [_]u8{13};
-    const actor_b = [_]u8{0} ** 15 ++ [_]u8{14};
+    const actor_a = @as([15]u8, @splat(0)) ++ [_]u8{13};
+    const actor_b = @as([15]u8, @splat(0)) ++ [_]u8{14};
     var first = try Replica.init(std.testing.allocator, actor_a);
     defer first.deinit();
     var second = try Replica.init(std.testing.allocator, actor_b);
@@ -3813,8 +3815,8 @@ test "critical replay maps through a concurrent tombstone" {
 }
 
 test "critical replay keeps a concurrent insertion when deleting its old range" {
-    const actor_a = [_]u8{0} ** 15 ++ [_]u8{15};
-    const actor_b = [_]u8{0} ** 15 ++ [_]u8{16};
+    const actor_a = @as([15]u8, @splat(0)) ++ [_]u8{15};
+    const actor_b = @as([15]u8, @splat(0)) ++ [_]u8{16};
     var first = try Replica.init(std.testing.allocator, actor_a);
     defer first.deinit();
     var second = try Replica.init(std.testing.allocator, actor_b);
@@ -3845,9 +3847,9 @@ test "critical replay keeps a concurrent insertion when deleting its old range" 
 
 test "overlapping concurrent deletes converge under duplicate out-of-order delivery" {
     const actors = [_]ActorId{
-        [_]u8{0} ** 15 ++ [_]u8{41},
-        [_]u8{0} ** 15 ++ [_]u8{42},
-        [_]u8{0} ** 15 ++ [_]u8{43},
+        @as([15]u8, @splat(0)) ++ [_]u8{41},
+        @as([15]u8, @splat(0)) ++ [_]u8{42},
+        @as([15]u8, @splat(0)) ++ [_]u8{43},
     };
     var replicas: [3]*Replica = undefined;
     for (&replicas, actors) |*slot, actor| slot.* = try Replica.init(std.testing.allocator, actor);
@@ -3917,10 +3919,10 @@ fn expectWalkerMatchesOracle(replica: *Replica) !void {
 
 test "generated branching histories match the exhaustive replay oracle" {
     const actors = [_]ActorId{
-        [_]u8{0} ** 15 ++ [_]u8{21},
-        [_]u8{0} ** 15 ++ [_]u8{22},
-        [_]u8{0} ** 15 ++ [_]u8{23},
-        [_]u8{0} ** 15 ++ [_]u8{24},
+        @as([15]u8, @splat(0)) ++ [_]u8{21},
+        @as([15]u8, @splat(0)) ++ [_]u8{22},
+        @as([15]u8, @splat(0)) ++ [_]u8{23},
+        @as([15]u8, @splat(0)) ++ [_]u8{24},
     };
     const snippets = [_][]const u8{ "a", "β", "XY", "🙂", "中" };
 
@@ -3994,10 +3996,10 @@ fn generateLocalEdits(replica: *Replica, random_state: *u64, edit_count: usize) 
 
 test "generated multi-round merge DAGs match the exhaustive replay oracle" {
     const actors = [_]ActorId{
-        [_]u8{0} ** 15 ++ [_]u8{51},
-        [_]u8{0} ** 15 ++ [_]u8{52},
-        [_]u8{0} ** 15 ++ [_]u8{53},
-        [_]u8{0} ** 15 ++ [_]u8{54},
+        @as([15]u8, @splat(0)) ++ [_]u8{51},
+        @as([15]u8, @splat(0)) ++ [_]u8{52},
+        @as([15]u8, @splat(0)) ++ [_]u8{53},
+        @as([15]u8, @splat(0)) ++ [_]u8{54},
     };
 
     var seed_index: usize = 0;
@@ -4066,10 +4068,10 @@ test "generated multi-round merge DAGs match the exhaustive replay oracle" {
 
 test "randomized offline replicas converge under reordering and duplicates" {
     const actors = [_]ActorId{
-        [_]u8{0} ** 15 ++ [_]u8{1},
-        [_]u8{0} ** 15 ++ [_]u8{2},
-        [_]u8{0} ** 15 ++ [_]u8{3},
-        [_]u8{0} ** 15 ++ [_]u8{4},
+        @as([15]u8, @splat(0)) ++ [_]u8{1},
+        @as([15]u8, @splat(0)) ++ [_]u8{2},
+        @as([15]u8, @splat(0)) ++ [_]u8{3},
+        @as([15]u8, @splat(0)) ++ [_]u8{4},
     };
     var replicas: [4]*Replica = undefined;
     for (&replicas, actors) |*slot, actor| slot.* = try Replica.init(std.testing.allocator, actor);

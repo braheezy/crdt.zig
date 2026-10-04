@@ -592,8 +592,8 @@ fn currentWidth(state: i32) usize {
 }
 
 test "independent oracle orders anchor descriptors regardless of delivery order" {
-    const a = ElementId{ .op = .{ .actor = [_]u8{0} ** 15 ++ [_]u8{1}, .counter = 0 } };
-    const b = ElementId{ .op = .{ .actor = [_]u8{0} ** 15 ++ [_]u8{2}, .counter = 0 } };
+    const a = ElementId{ .op = .{ .actor = @as([15]u8, @splat(0)) ++ [_]u8{1}, .counter = 0 } };
+    const b = ElementId{ .op = .{ .actor = @as([15]u8, @splat(0)) ++ [_]u8{2}, .counter = 0 } };
 
     var first = try Oracle.init(std.testing.allocator);
     defer first.deinit();

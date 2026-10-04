@@ -48,7 +48,7 @@ const Lcg = struct {
 };
 
 fn actor(last_byte: u8) ActorId {
-    var value = [_]u8{0} ** 16;
+    var value: [16]u8 = @splat(0);
     value[15] = last_byte;
     return value;
 }
@@ -225,7 +225,7 @@ fn deliverPermutation(
 
 fn actorFromName(name: []const u8) !ActorId {
     if (name.len > 16) return error.ActorNameTooLong;
-    var result = [_]u8{0} ** 16;
+    var result: [16]u8 = @splat(0);
     @memcpy(result[0..name.len], name);
     return result;
 }
